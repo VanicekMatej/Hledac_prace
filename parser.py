@@ -53,7 +53,7 @@ def zpracuj_zaznam(job):
             if adresa.get("kraj"):
                 kraj_kod = adresa["kraj"].get("id")
 
-    # Kontakt
+    
     kontakt_jmeno = kontakt_telefon = kontakt_email = None
     prvni_kontakt = job.get("prvniKontaktSeZamestnavatelem") or {}
     if prvni_kontakt.get("komuSeHlasit"):
@@ -63,7 +63,7 @@ def zpracuj_zaznam(job):
         kontakt_telefon = k.get("telefon")
         kontakt_email = k.get("email")
 
-    # Zamestnavatel
+    
     zamestnavatel = None
     if job.get("zamestnavatel"):
         zamestnavatel = job["zamestnavatel"].get("nazev")
