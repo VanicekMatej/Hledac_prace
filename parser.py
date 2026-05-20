@@ -43,11 +43,14 @@ def zpracuj_zaznam(job):
     obec_kod = okres_kod = kraj_kod = None
     misto = job.get("mistoVykonuPrace") or {}
     if misto:
+        # Obec může být na hlavní úrovni nebo v adrese pracoviště
         if misto.get("obec"):
             obec_kod = misto["obec"].get("id")
         pracoviste = misto.get("pracoviste") or []
         if pracoviste:
             adresa = pracoviste[0].get("adresa") or {}
+            if adresa.get("obec") and not obec_kod:
+                obec_kod = adresa["obec"].get("id")
             if adresa.get("okres"):
                 okres_kod = adresa["okres"].get("id")
             if adresa.get("kraj"):

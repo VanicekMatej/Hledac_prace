@@ -86,6 +86,44 @@ def seznam_jobu(
         "vysledky": [dict(r) for r in rows]
     }
 
+@app.get("/jobs/mapa")
+def jobs_mapa(
+    profese:   Optional[str] = Query(None),
+    kraj:      Optional[str] = Query(None),
+    okres:     Optional[str] = Query(None),
+    plat_od:   Optional[int] = Query(None),
+    plat_do:   Optional[int] = Query(None),
+):
+    conn = get_db()
+
+    sql = """
+        SELECT j.id, j.profese, j.zamestnavatel, j.plat_od, ob.nazev as obec, ob.lat, ob.lon
+        FROM jobs j
+        LEFT JOIN obce ob ON j.obec_kod = ob.id
+        WHERE ob.lat IS NOT NULL
+    """
+    params = []
+
+    if profese:
+        sql += " AND j.profese LIKE ?"
+        params.append(f"%{profese}%")
+    if kraj:
+        sql += " AND j.kraj_kod = ?"
+        params.append(kraj)
+    if okres:
+        sql += " AND j.okres_kod = ?"
+        params.append(okres)
+    if plat_od:
+        sql += " AND j.plat_od >= ?"
+        params.append(plat_od)
+    if plat_do:
+        sql += " AND j.plat_do <= ?"
+        params.append(plat_do)
+
+    rows = conn.execute(sql, params).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
 @app.get("/jobs/{job_id}")
 def detail_jobu(job_id: str):
     conn = get_db()
