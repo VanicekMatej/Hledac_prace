@@ -2,40 +2,53 @@ import requests
 import sqlite3
 import time
 
+
+
 conn = sqlite3.connect("jobs.db")
 
-try:
-    conn.execute("ALTER TABLE obce ADD COLUMN lat REAL")
-    conn.execute("ALTER TABLE obce ADD COLUMN lon REAL")
-    conn.commit()
-except:
-    pass
-
+# Načteme POUZE obce které ještě nemají GPS
 obce = conn.execute("""
-    SELECT DISTINCT o.id, o.nazev 
+    SELECT o.id, o.nazev, k.nazev as kraj_nazev
     FROM obce o
     INNER JOIN jobs j ON j.obec_kod = o.id
+    LEFT JOIN kraje k ON o.kraj_id = k.id
     WHERE o.lat IS NULL
+    GROUP BY o.id
 """).fetchall()
 
-print(f"Obcí použitých v pracovních místech: {len(obce)}")
+print(f"Zbývá obcí k geokódování: {len(obce)}")
 
 nalezeno = 0
 chyba = 0
 
-for i, (obec_id, nazev) in enumerate(obce):
+for i, (obec_id, nazev, kraj_nazev) in enumerate(obce):
     try:
-        res = requests.get(
+        params = {
+            "city": nazev,
+            "country": "CZ",
+            "format": "json",
+            "limit": 5,
+        }
+        if kraj_nazev:
+            params["state"] = kraj_nazev
+
+        raw = requests.get(
             "https://nominatim.openstreetmap.org/search",
-            params={
-                "city": nazev,
-                "country": "CZ",
-                "format": "json",
-                "limit": 1
-            },
+            params=params,
             headers={"User-Agent": "hledac-prace-app/1.0"},
             timeout=10
-        ).json()
+        )
+
+        if raw.status_code == 429:
+            print(f"  Rate limit! Čekám 60s...")
+            time.sleep(60)
+            continue
+
+        if not raw.text.strip() or raw.status_code != 200:
+            chyba += 1
+            continue
+
+        res = raw.json()
 
         if res:
             lat = float(res[0]["lat"])
@@ -45,15 +58,16 @@ for i, (obec_id, nazev) in enumerate(obce):
         else:
             chyba += 1
 
-        if i % 50 == 0:
+        if i % 10 == 0:
             conn.commit()
             print(f"  {i}/{len(obce)} — nalezeno: {nalezeno}, nenalezeno: {chyba}")
 
-        time.sleep(1)
+        time.sleep(1.5)
 
     except Exception as e:
         chyba += 1
         print(f"  Chyba u {nazev}: {e}")
+        time.sleep(5)
 
 conn.commit()
 conn.close()
